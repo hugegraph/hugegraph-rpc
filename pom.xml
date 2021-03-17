@@ -42,6 +42,13 @@
     </properties>
 
     <dependencies>
+        <!-- hugegraph-common -->
+        <dependency>
+            <groupId>com.baidu.hugegraph</groupId>
+            <artifactId>hugegraph-common</artifactId>
+            <version>1.8.5</version>
+        </dependency>
+
         <!-- sofa rpc -->
         <dependency>
             <groupId>com.lmax</groupId>
