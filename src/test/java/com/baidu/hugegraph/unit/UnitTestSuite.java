@@ -25,6 +25,7 @@ import org.junit.runners.Suite;
 @RunWith(Suite.class)
 @Suite.SuiteClasses({
     VersionTest.class,
+    ExceptionTest.class,
     ServerClientTest.class
 })
 public class UnitTestSuite {

@@ -23,8 +23,12 @@ import java.net.URL;
 
 import org.junit.BeforeClass;
 
+import com.alipay.sofa.rpc.common.RpcOptions;
 import com.baidu.hugegraph.config.HugeConfig;
 import com.baidu.hugegraph.config.OptionSpace;
+import com.baidu.hugegraph.rpc.RpcCommonConfig;
+import com.baidu.hugegraph.rpc.RpcServer;
+import com.google.common.collect.ImmutableMap;
 
 public class BaseUnitTest {
 
@@ -34,9 +38,24 @@ public class BaseUnitTest {
     }
 
     protected static HugeConfig config(boolean server) {
-        String name = String.format("rpc-%s.properties",
-                                    server ? "server" : "client");
+        return config(server ? "server" : "client");
+    }
+
+    protected static HugeConfig config(String type) {
+        String name = String.format("rpc-%s.properties", type);
         URL conf = BaseUnitTest.class.getClassLoader().getResource(name);
         return new HugeConfig(conf.getPath());
+    }
+
+    protected static void starServer(RpcServer rpcServer) {
+        rpcServer.config().configs().values().forEach(c -> {
+            c.setRepeatedExportLimit(100);
+        });
+
+        ImmutableMap<String, Object> fixedOptions = ImmutableMap.of(
+                RpcOptions.PROVIDER_REPEATED_EXPORT_LIMIT, 100);
+        RpcCommonConfig.initRpcConfigs(fixedOptions);
+
+        rpcServer.exportAll();
     }
 }
