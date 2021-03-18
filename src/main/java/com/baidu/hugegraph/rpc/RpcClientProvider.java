@@ -54,7 +54,9 @@ public class RpcClientProvider {
     }
 
     public void destroy() {
-        // May call Cluster.destroy()
+        if (this.consumerConfig != null) {
+            this.consumerConfig.destroy();
+        }
     }
 
     protected static String excludeSelfUrl(String rpcUrl, String selfUrl) {

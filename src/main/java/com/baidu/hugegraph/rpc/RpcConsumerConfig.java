@@ -22,9 +22,11 @@ package com.baidu.hugegraph.rpc;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.slf4j.Logger;
 
+import com.alipay.sofa.rpc.bootstrap.Bootstraps;
 import com.alipay.sofa.rpc.bootstrap.ConsumerBootstrap;
 import com.alipay.sofa.rpc.client.AbstractCluster;
 import com.alipay.sofa.rpc.client.Cluster;
@@ -39,13 +41,16 @@ import com.alipay.sofa.rpc.ext.ExtensionLoaderFactory;
 import com.baidu.hugegraph.config.HugeConfig;
 import com.baidu.hugegraph.config.RpcOptions;
 import com.baidu.hugegraph.util.Log;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 
 public class RpcConsumerConfig implements RpcServiceConfig4Client {
 
     private final HugeConfig conf;
     private final String remoteUrls;
     private final Map<String, ConsumerConfig<?>> configs;
+    private final List<ConsumerBootstrap<?>> bootstraps;
 
     static {
          ExtensionLoaderFactory.getExtensionLoader(Cluster.class)
@@ -57,19 +62,31 @@ public class RpcConsumerConfig implements RpcServiceConfig4Client {
         this.conf = config;
         this.remoteUrls = remoteUrls;
         this.configs = Maps.newHashMap();
+        this.bootstraps = Lists.newArrayList();
+    }
+
+    @Override
+    public <T> T serviceProxy(String interfaceId) {
+        return this.serviceProxy(null, interfaceId);
     }
 
     @Override
     public <T> T serviceProxy(String graph, String interfaceId) {
         ConsumerConfig<T> config = this.consumerConfig(graph, interfaceId);
-        return config.refer();
+        ConsumerBootstrap<T> bootstrap = Bootstraps.from(config);
+        this.bootstraps.add(bootstrap);
+        return bootstrap.refer();
     }
 
-    @Override
-    public <T> T serviceProxy(String interfaceId) {
-        // TODO: seems we can use DefaultConsumerBootstrap
-        ConsumerConfig<T> config = this.consumerConfig(null, interfaceId);
-        return config.refer();
+    public void destroy() {
+        Set<Cluster> clusters = Sets.newHashSet();
+        for (ConsumerBootstrap<?> bootstrap : this.bootstraps) {
+            bootstrap.unRefer();
+            clusters.add(bootstrap.getCluster());
+        }
+        for (Cluster cluster : clusters) {
+            cluster.destroy();
+        }
     }
 
     private <T> ConsumerConfig<T> consumerConfig(String graph,
