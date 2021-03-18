@@ -32,25 +32,29 @@ public class RpcClientProvider {
 
     private final RpcConsumerConfig consumerConfig;
 
-    public RpcClientProvider(HugeConfig conf) {
+    public RpcClientProvider(HugeConfig config) {
         // TODO: fetch from registry server
-        String rpcUrl = conf.get(RpcOptions.RPC_REMOTE_URL);
-        String selfUrl = conf.get(RpcOptions.RPC_SERVER_HOST) + ":" +
-                         conf.get(RpcOptions.RPC_SERVER_PORT);
+        String rpcUrl = config.get(RpcOptions.RPC_REMOTE_URL);
+        String selfUrl = config.get(RpcOptions.RPC_SERVER_HOST) + ":" +
+                         config.get(RpcOptions.RPC_SERVER_PORT);
         rpcUrl = excludeSelfUrl(rpcUrl, selfUrl);
         this.consumerConfig = StringUtils.isNotBlank(rpcUrl) ?
-                              new RpcConsumerConfig(conf, rpcUrl) : null;
+                              new RpcConsumerConfig(config, rpcUrl) : null;
     }
-
     public boolean enabled() {
         return this.consumerConfig != null;
     }
 
     public RpcConsumerConfig config() {
         E.checkArgument(this.consumerConfig != null,
-                        "RpcClient is not enabled, please config option '%s'",
+                        "RpcClient is not enabled, please config option '%s' " +
+                        "and ensure to add an address other than self service",
                         RpcOptions.RPC_REMOTE_URL.name());
         return this.consumerConfig;
+    }
+
+    public void destroy() {
+        // May call Cluster.destroy()
     }
 
     protected static String excludeSelfUrl(String rpcUrl, String selfUrl) {

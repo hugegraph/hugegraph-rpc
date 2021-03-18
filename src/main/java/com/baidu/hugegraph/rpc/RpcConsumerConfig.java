@@ -52,9 +52,9 @@ public class RpcConsumerConfig implements RpcServiceConfig4Client {
                                .loadExtension(FanoutCluster.class);
     }
 
-    public RpcConsumerConfig(HugeConfig conf, String remoteUrls) {
-        RpcCommonConfig.initRpcConfigs(conf);
-        this.conf = conf;
+    public RpcConsumerConfig(HugeConfig config, String remoteUrls) {
+        RpcCommonConfig.initRpcConfigs(config);
+        this.conf = config;
         this.remoteUrls = remoteUrls;
         this.configs = Maps.newHashMap();
     }
@@ -67,6 +67,7 @@ public class RpcConsumerConfig implements RpcServiceConfig4Client {
 
     @Override
     public <T> T serviceProxy(String interfaceId) {
+        // TODO: seems we can use DefaultConsumerBootstrap
         ConsumerConfig<T> config = this.consumerConfig(null, interfaceId);
         return config.refer();
     }

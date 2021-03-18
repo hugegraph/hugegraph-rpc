@@ -39,21 +39,21 @@ public class RpcOptions extends OptionHolder {
         return instance;
     }
 
+    public static final ConfigOption<String> RPC_SERVER_HOST =
+            new ConfigOption<>(
+                    "rpc.server_host",
+                    "The hosts/ips bound by rpc server to provide services, " +
+                    "empty value means not enabled.",
+                    null,
+                    ""
+            );
+
     public static final ConfigOption<Integer> RPC_SERVER_PORT =
             new ConfigOption<>(
                     "rpc.server_port",
                     "The port bound by rpc server to provide services.",
                     rangeInt(1, Integer.MAX_VALUE),
                     8090
-            );
-
-    public static final ConfigOption<String> RPC_SERVER_HOST =
-            new ConfigOption<>(
-                    "rpc.server_host",
-                    "The hosts/ips bound by rpc server to provide " +
-                    "services.",
-                    disallowEmpty(),
-                    "127.0.0.1"
             );
 
     public static final ConfigOption<Integer> RPC_SERVER_TIMEOUT =
@@ -68,9 +68,10 @@ public class RpcOptions extends OptionHolder {
             new ConfigOption<>(
                     "rpc.remote_url",
                     "The remote urls of rpc peers, it can be set to " +
-                    "multiple addresses, which are concat by ','.",
-                    disallowEmpty(),
-                    "127.0.0.1:8090"
+                    "multiple addresses, which are concat by ',', " +
+                    "empty value means not enabled.",
+                    null,
+                    ""
             );
 
     public static final ConfigOption<Integer> RPC_CLIENT_CONNECT_TIMEOUT =

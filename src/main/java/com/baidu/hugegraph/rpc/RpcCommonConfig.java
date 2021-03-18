@@ -27,11 +27,11 @@ import com.baidu.hugegraph.config.RpcOptions;
 
 public class RpcCommonConfig {
 
-    public static void initRpcConfigs(HugeConfig conf) {
+    public static void initRpcConfigs(HugeConfig config) {
         RpcConfigs.putValue("rpc.config.order",
-                            conf.get(RpcOptions.RPC_CONFIG_ORDER));
+                            config.get(RpcOptions.RPC_CONFIG_ORDER));
         RpcConfigs.putValue("logger.impl",
-                            conf.get(RpcOptions.RPC_LOGGER_IMPL));
+                            config.get(RpcOptions.RPC_LOGGER_IMPL));
     }
 
     public static void initRpcConfigs(String key, Object value) {

@@ -24,10 +24,12 @@ import java.util.Map;
 import org.apache.commons.collections.MapUtils;
 import org.slf4j.Logger;
 
+import com.alipay.sofa.rpc.common.utils.StringUtils;
 import com.alipay.sofa.rpc.config.ProviderConfig;
 import com.alipay.sofa.rpc.config.ServerConfig;
 import com.baidu.hugegraph.config.HugeConfig;
 import com.baidu.hugegraph.config.RpcOptions;
+import com.baidu.hugegraph.util.E;
 import com.baidu.hugegraph.util.Log;
 
 public class RpcServer {
@@ -38,18 +40,31 @@ public class RpcServer {
     private final RpcProviderConfig configs;
     private final ServerConfig serverConfig;
 
-    public RpcServer(HugeConfig conf) {
-        RpcCommonConfig.initRpcConfigs(conf);
-        this.conf = conf;
-        this.serverConfig = new ServerConfig();
-        this.serverConfig.setProtocol(conf.get(RpcOptions.RPC_PROTOCOL))
-                         .setHost(conf.get(RpcOptions.RPC_SERVER_HOST))
-                         .setPort(conf.get(RpcOptions.RPC_SERVER_PORT))
-                         .setDaemon(false);
+    public RpcServer(HugeConfig config) {
+        RpcCommonConfig.initRpcConfigs(config);
+        this.conf = config;
         this.configs = new RpcProviderConfig();
+
+        String host = config.get(RpcOptions.RPC_SERVER_HOST);
+        if (StringUtils.isNotBlank(host)) {
+            int port = config.get(RpcOptions.RPC_SERVER_PORT);
+            this.serverConfig = new ServerConfig();
+            this.serverConfig.setProtocol(config.get(RpcOptions.RPC_PROTOCOL))
+                             .setHost(host).setPort(port)
+                             .setDaemon(false);
+        } else {
+            this.serverConfig = null;
+        }
+    }
+
+    public boolean enabled() {
+        return this.serverConfig != null;
     }
 
     public RpcProviderConfig config() {
+        E.checkArgument(this.enabled(),
+                        "RpcServer is not enabled, please config option '%s'",
+                        RpcOptions.RPC_SERVER_HOST.name());
         return this.configs;
     }
 
