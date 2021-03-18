@@ -24,11 +24,15 @@ import java.util.Map;
 import org.apache.commons.collections.MapUtils;
 import org.slf4j.Logger;
 
+import com.alipay.remoting.RemotingServer;
 import com.alipay.sofa.rpc.common.utils.StringUtils;
 import com.alipay.sofa.rpc.config.ProviderConfig;
 import com.alipay.sofa.rpc.config.ServerConfig;
+import com.alipay.sofa.rpc.server.Server;
+import com.alipay.sofa.rpc.server.bolt.BoltServer;
 import com.baidu.hugegraph.config.HugeConfig;
 import com.baidu.hugegraph.config.RpcOptions;
+import com.baidu.hugegraph.testutil.Whitebox;
 import com.baidu.hugegraph.util.E;
 import com.baidu.hugegraph.util.Log;
 
@@ -73,6 +77,18 @@ public class RpcServer {
 
     public int port() {
         this.checkEnabled();
+        Server server = this.serverConfig.getServer();
+        if (server instanceof BoltServer && server.isStarted()) {
+            /*
+             * When using random port 0, try to fetch the actual port
+             * TODO: remove this code after adding Server.port() interface
+             *       https://github.com/sofastack/sofa-rpc/issues/1022
+             */
+            RemotingServer rs = Whitebox.getInternalState(server,
+                                                          "remotingServer");
+            return rs.port();
+        }
+        // When using random port 0, the returned port is not the actual port
         return this.serverConfig.getPort();
     }
 

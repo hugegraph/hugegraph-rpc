@@ -52,7 +52,7 @@ public class RpcOptions extends OptionHolder {
             new ConfigOption<>(
                     "rpc.server_port",
                     "The port bound by rpc server to provide services.",
-                    rangeInt(1, Integer.MAX_VALUE),
+                    rangeInt(0, Integer.MAX_VALUE),
                     8090
             );
 
