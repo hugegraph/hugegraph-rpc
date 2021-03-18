@@ -61,16 +61,8 @@
             <version>5.7.6</version>
             <exclusions>
                 <exclusion>
-                    <groupId>io.netty</groupId>
-                    <artifactId>netty-all</artifactId>
-                </exclusion>
-                <exclusion>
                     <groupId>org.jboss.resteasy</groupId>
                     <artifactId>resteasy-client</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>com.alipay.sofa</groupId>
-                    <artifactId>bolt</artifactId>
                 </exclusion>
                 <exclusion>
                     <groupId>org.apache.httpcomponents</groupId>
@@ -81,16 +73,8 @@
                     <artifactId>httpmime</artifactId>
                 </exclusion>
                 <exclusion>
-                    <groupId>com.alipay.sofa.common</groupId>
-                    <artifactId>sofa-common-tools</artifactId>
-                </exclusion>
-                <exclusion>
                     <groupId>org.jboss.logging</groupId>
                     <artifactId>jboss-logging</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>com.alipay.sofa</groupId>
-                    <artifactId>hessian</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -112,6 +96,7 @@
                     </compilerArgs>
                 </configuration>
             </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-checkstyle-plugin</artifactId>
@@ -134,6 +119,7 @@
                     </execution>
                 </executions>
             </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
@@ -149,6 +135,11 @@
                                 true
                             </addDefaultSpecificationEntries>
                         </manifest>
+                        <manifestEntries>
+                            <!-- Must be on one line, otherwise the automatic
+                                 upgrade script cannot replace the version number -->
+                            <Implementation-Version>1.0.0.0</Implementation-Version>
+                        </manifestEntries>
                     </archive>
                 </configuration>
             </plugin>
@@ -177,6 +168,13 @@
                 </executions>
             </plugin>
         </plugins>
+
+        <resources>
+            <resource>
+                <directory>src/test/resources/</directory>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
     </build>
 
     <profiles>
