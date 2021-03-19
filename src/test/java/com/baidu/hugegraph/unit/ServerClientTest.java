@@ -69,13 +69,16 @@ public class ServerClientTest extends BaseUnitTest {
 
     @Test
     public void testSimpleService() {
+        // Init server
         RpcProviderConfig serverConfig = rpcServer.config();
         serverConfig.addService(HelloService.class, new HelloServiceImpl());
         startServer(rpcServer);
 
+        // Init client
         RpcConsumerConfig clientConfig = rpcClient.config();
         HelloService client = clientConfig.serviceProxy(HelloService.class);
 
+        // Test call
         Assert.assertEquals("hello tom!", client.hello("tom"));
         Assert.assertEquals("tom", client.echo("tom"));
         Assert.assertEquals(5.14, client.sum(2, 3.14), 0.00000001d);
@@ -83,6 +86,7 @@ public class ServerClientTest extends BaseUnitTest {
 
     @Test
     public void testMultiService() {
+        // Init server
         GraphHelloServiceImpl g1 = new GraphHelloServiceImpl("g1");
         GraphHelloServiceImpl g2 = new GraphHelloServiceImpl("g2");
         GraphHelloServiceImpl g3 = new GraphHelloServiceImpl("g3");
@@ -93,11 +97,13 @@ public class ServerClientTest extends BaseUnitTest {
         serverConfig.addService(g3.graph(), HelloService.class, g3);
         startServer(rpcServer);
 
+        // Init client
         RpcConsumerConfig clientConfig = rpcClient.config();
         HelloService c1 = clientConfig.serviceProxy("g1", HelloService.class);
         HelloService c2 = clientConfig.serviceProxy("g2", HelloService.class);
         HelloService c3 = clientConfig.serviceProxy("g3", HelloService.class);
 
+        // Test call
         Assert.assertEquals("g1: hello tom!", c1.hello("tom"));
         Assert.assertEquals("g1: tom", c1.echo("tom"));
         Assert.assertEquals(5.14, c1.sum(2, 3.14), 0.00000001d);
@@ -340,23 +346,27 @@ public class ServerClientTest extends BaseUnitTest {
 
     @Test
     public void testServiceProxy() {
+        // Init server
         RpcProviderConfig serverConfig = rpcServer.config();
         serverConfig.addService(HelloService.class, new HelloServiceImpl());
         serverConfig.addService("graph", HelloService.class,
                                 new GraphHelloServiceImpl("graph"));
         startServer(rpcServer);
 
+        // Init client
         RpcConsumerConfig clientConfig = rpcClient.config();
         HelloService client = clientConfig.serviceProxy(HelloService.class);
         HelloService client2 = clientConfig.serviceProxy(HelloService.class);
         HelloService clientG = clientConfig.serviceProxy("graph",
                                                          HelloService.class);
 
+        // Test call
         Assert.assertNotEquals(client, client2);
         Assert.assertEquals("hello tom!", client.hello("tom"));
         Assert.assertEquals("hello tom!", client2.hello("tom"));
         Assert.assertEquals("graph: hello tom!", clientG.hello("tom"));
 
+        // Test call after unrefer
         rpcClient.unreferAll();
 
         Assert.assertThrows(SofaRpcRuntimeException.class, () -> {

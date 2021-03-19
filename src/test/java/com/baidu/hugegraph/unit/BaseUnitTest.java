@@ -54,12 +54,5 @@ public class BaseUnitTest {
 
     protected static void stopServer(RpcServer rpcServer) {
         rpcServer.destroy();
-
-        // Sleep to free the port
-        try {
-            Thread.sleep(100);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
     }
 }
