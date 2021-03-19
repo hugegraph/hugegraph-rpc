@@ -23,12 +23,9 @@ import java.net.URL;
 
 import org.junit.BeforeClass;
 
-import com.alipay.sofa.rpc.common.RpcOptions;
 import com.baidu.hugegraph.config.HugeConfig;
 import com.baidu.hugegraph.config.OptionSpace;
-import com.baidu.hugegraph.rpc.RpcCommonConfig;
 import com.baidu.hugegraph.rpc.RpcServer;
-import com.google.common.collect.ImmutableMap;
 
 public class BaseUnitTest {
 
@@ -47,15 +44,22 @@ public class BaseUnitTest {
         return new HugeConfig(conf.getPath());
     }
 
-    protected static void starServer(RpcServer rpcServer) {
+    protected static void startServer(RpcServer rpcServer) {
         rpcServer.config().configs().values().forEach(c -> {
             c.setRepeatedExportLimit(100);
         });
 
-        ImmutableMap<String, Object> fixedOptions = ImmutableMap.of(
-                RpcOptions.PROVIDER_REPEATED_EXPORT_LIMIT, 100);
-        RpcCommonConfig.initRpcConfigs(fixedOptions);
-
         rpcServer.exportAll();
+    }
+
+    protected static void stopServer(RpcServer rpcServer) {
+        rpcServer.destroy();
+
+        // Sleep to free the port
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 }

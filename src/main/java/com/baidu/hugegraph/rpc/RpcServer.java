@@ -62,13 +62,22 @@ public class RpcServer {
     }
 
     public RpcProviderConfig config() {
-        E.checkArgument(this.enabled(),
-                        "RpcServer is not enabled, please config option '%s'",
-                        RpcOptions.RPC_SERVER_HOST.name());
+        this.checkEnabled();
         return this.configs;
     }
 
+    public String host() {
+        this.checkEnabled();
+        return this.serverConfig.getBoundHost();
+    }
+
+    public int port() {
+        this.checkEnabled();
+        return this.serverConfig.getPort();
+    }
+
     public void exportAll() {
+        this.checkEnabled();
         LOG.debug("RpcServer starting on port {}", this.port());
         Map<String, ProviderConfig<?>> configs = this.configs.configs();
         if (MapUtils.isEmpty(configs)) {
@@ -84,20 +93,18 @@ public class RpcServer {
         LOG.info("RpcServer started success on port {}", this.port());
     }
 
-    public void unExport(String serviceName) {
-        Map<String, ProviderConfig<?>> configs = this.configs.configs();
-        if (!configs.containsKey(serviceName)) {
-            throw new RpcException("The service name '%s' doesn't exist",
-                                   serviceName);
-        }
-        configs.get(serviceName).unExport();
+    public void unexportAll() {
+        this.configs.removeAllService();
     }
 
-    public int port() {
-        return this.serverConfig.getPort();
+    public void unexport(String serviceId) {
+        this.configs.removeService(serviceId);
     }
 
     public void destroy() {
+        if (!this.enabled()) {
+            return;
+        }
         LOG.info("RpcServer stop on port {}", this.port());
         for (ProviderConfig<?> config : this.configs.configs().values()) {
             Object service = config.getRef();
@@ -109,6 +116,13 @@ public class RpcServer {
                 }
             }
         }
+        this.configs.removeAllService();
         this.serverConfig.destroy();
+    }
+
+    private void checkEnabled() {
+        E.checkArgument(this.enabled(),
+                        "RpcServer is not enabled, please config option '%s'",
+                        RpcOptions.RPC_SERVER_HOST.name());
     }
 }

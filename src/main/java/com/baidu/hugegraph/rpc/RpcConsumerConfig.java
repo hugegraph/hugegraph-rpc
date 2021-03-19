@@ -78,6 +78,13 @@ public class RpcConsumerConfig implements RpcServiceConfig4Client {
         return bootstrap.refer();
     }
 
+    @Override
+    public void removeAllServiceProxy() {
+        for (ConsumerBootstrap<?> bootstrap : this.bootstraps) {
+            bootstrap.unRefer();
+        }
+    }
+
     public void destroy() {
         Set<Cluster> clusters = Sets.newHashSet();
         for (ConsumerBootstrap<?> bootstrap : this.bootstraps) {

@@ -19,17 +19,22 @@
 
 package com.baidu.hugegraph.unit;
 
+import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.alipay.sofa.rpc.common.RpcOptions;
+import com.alipay.sofa.rpc.core.exception.SofaRpcException;
+import com.alipay.sofa.rpc.core.exception.SofaRpcRuntimeException;
+import com.baidu.hugegraph.config.HugeConfig;
 import com.baidu.hugegraph.rpc.RpcClientProvider;
 import com.baidu.hugegraph.rpc.RpcCommonConfig;
 import com.baidu.hugegraph.rpc.RpcConsumerConfig;
 import com.baidu.hugegraph.rpc.RpcProviderConfig;
 import com.baidu.hugegraph.rpc.RpcServer;
 import com.baidu.hugegraph.testutil.Assert;
+import com.google.common.collect.ImmutableMap;
 
 public class ServerClientTest extends BaseUnitTest {
 
@@ -52,11 +57,21 @@ public class ServerClientTest extends BaseUnitTest {
         }
     }
 
+    @After
+    public void teardown() {
+        if (rpcClient != null) {
+            rpcClient.unreferAll();
+        }
+        if (rpcServer != null) {
+            rpcServer.unexportAll();
+        }
+    }
+
     @Test
     public void testSimpleService() {
         RpcProviderConfig serverConfig = rpcServer.config();
         serverConfig.addService(HelloService.class, new HelloServiceImpl());
-        starServer(rpcServer);
+        startServer(rpcServer);
 
         RpcConsumerConfig clientConfig = rpcClient.config();
         HelloService client = clientConfig.serviceProxy(HelloService.class);
@@ -76,7 +91,7 @@ public class ServerClientTest extends BaseUnitTest {
         serverConfig.addService(g1.graph(), HelloService.class, g1);
         serverConfig.addService(g2.graph(), HelloService.class, g2);
         serverConfig.addService(g3.graph(), HelloService.class, g3);
-        starServer(rpcServer);
+        startServer(rpcServer);
 
         RpcConsumerConfig clientConfig = rpcClient.config();
         HelloService c1 = clientConfig.serviceProxy("g1", HelloService.class);
@@ -101,29 +116,415 @@ public class ServerClientTest extends BaseUnitTest {
     }
 
     @Test
-    public void testStartBothServerAndClient() {
+    public void testStartBothServerAndClientThroughSameConfig() {
+        // Init server1
+        HugeConfig server1 = config("server1-client");
+        RpcServer rpcServer1 = new RpcServer(server1);
+        RpcClientProvider rpcClient1 = new RpcClientProvider(server1);
 
-    }
+        GraphHelloServiceImpl s1g1 = new GraphHelloServiceImpl("g1");
+        GraphHelloServiceImpl s1g2 = new GraphHelloServiceImpl("g2");
 
-    @Test
-    public void testLoadBalancer() {
-        RpcCommonConfig.initRpcConfigs(RpcOptions.CONSUMER_LOAD_BALANCER,
-                                       "random");
-    }
+        rpcServer1.config().addService(s1g1.graph(), HelloService.class, s1g1);
+        rpcServer1.config().addService(s1g2.graph(), HelloService.class, s1g2);
 
-    @Test
-    public void testExportNoneService() {
+        startServer(rpcServer1);
 
-    }
+        // Init server2
+        HugeConfig server2 = config("server2-client");
+        RpcServer rpcServer2 = new RpcServer(server2);
+        RpcClientProvider rpcClient2 = new RpcClientProvider(server2);
 
-    @Test
-    public void testUnExportService() {
+        GraphHelloServiceImpl s2g1 = new GraphHelloServiceImpl("g1");
+        GraphHelloServiceImpl s2g2 = new GraphHelloServiceImpl("g2");
 
+        rpcServer2.config().addService(s2g1.graph(), HelloService.class, s2g1);
+        rpcServer2.config().addService(s2g2.graph(), HelloService.class, s2g2);
+
+        startServer(rpcServer2);
+
+        // Init client1
+        HelloService s2g1Client = rpcClient1.config().serviceProxy(
+                                  "g1", HelloService.class);
+        HelloService s2g2Client = rpcClient1.config().serviceProxy(
+                                  "g2", HelloService.class);
+
+        // Init client2
+        HelloService s1g1Client = rpcClient2.config().serviceProxy(
+                                  "g1", HelloService.class);
+        HelloService s1g2Client = rpcClient2.config().serviceProxy(
+                                  "g2", HelloService.class);
+
+        // Test call
+        Assert.assertEquals(2.1, s2g1Client.sum(1, 1.1), 0.00000001d);
+        Assert.assertEquals(2.2, s2g2Client.sum(1, 1.2), 0.00000001d);
+
+        Assert.assertEquals(1.1, s1g1Client.sum(1, 0.1), 0.00000001d);
+        Assert.assertEquals(1.2, s1g2Client.sum(0, 1.2), 0.00000001d);
+
+        Assert.assertEquals(1.1, s1g1.result(), 0.00000001d);
+        Assert.assertEquals(1.2, s1g2.result(), 0.00000001d);
+        Assert.assertEquals(2.1, s2g1.result(), 0.00000001d);
+        Assert.assertEquals(2.2, s2g2.result(), 0.00000001d);
+
+        // Destroy all
+        rpcClient1.destroy();
+        rpcClient2.destroy();
+        stopServer(rpcServer1);
+        stopServer(rpcServer2);
     }
 
     @Test
     public void testRpcFanoutService() {
+        // Init 3 servers
+        HugeConfig server3 = config("server3");
+        RpcServer rpcServer3 = new RpcServer(server3);
 
+        HugeConfig server4 = config("server4");
+        RpcServer rpcServer4 = new RpcServer(server4);
+
+        HugeConfig server5 = config("server5");
+        RpcServer rpcServer5 = new RpcServer(server5);
+
+        GraphHelloServiceImpl s3g1 = new GraphHelloServiceImpl("g1");
+        GraphHelloServiceImpl s4g1 = new GraphHelloServiceImpl("g1");
+        GraphHelloServiceImpl s5g1 = new GraphHelloServiceImpl("g1");
+
+        rpcServer3.config().addService(s3g1.graph(), HelloService.class, s3g1);
+        rpcServer4.config().addService(s4g1.graph(), HelloService.class, s4g1);
+        rpcServer5.config().addService(s5g1.graph(), HelloService.class, s5g1);
+
+        startServer(rpcServer3);
+        startServer(rpcServer4);
+        startServer(rpcServer5);
+
+        // Init client
+        HugeConfig client345 = config("client345");
+        RpcClientProvider rpcClient345 = new RpcClientProvider(client345);
+
+        HelloService g1 = rpcClient345.config()
+                                      .serviceProxy("g1", HelloService.class);
+
+        // Test fanout
+        Assert.assertEquals("g1: fanout", g1.echo("fanout"));
+        Assert.assertEquals(16.8, g1.sum(10, 6.8), 0.00000001d);
+
+        Assert.assertEquals(16.8, s3g1.result(), 0.00000001d);
+        Assert.assertEquals(16.8, s4g1.result(), 0.00000001d);
+        Assert.assertEquals(16.8, s5g1.result(), 0.00000001d);
+
+        // Destroy all
+        rpcClient345.destroy();
+
+        stopServer(rpcServer3);
+        stopServer(rpcServer4);
+        stopServer(rpcServer5);
+    }
+
+    @Test
+    public void testLoadBalancer() {
+        // Init 3 servers
+        HugeConfig server3 = config("server3");
+        RpcServer rpcServer3 = new RpcServer(server3);
+
+        HugeConfig server4 = config("server4");
+        RpcServer rpcServer4 = new RpcServer(server4);
+
+        HugeConfig server5 = config("server5");
+        RpcServer rpcServer5 = new RpcServer(server5);
+
+        GraphHelloServiceImpl s3g1 = new GraphHelloServiceImpl("g1");
+        GraphHelloServiceImpl s4g1 = new GraphHelloServiceImpl("g1");
+        GraphHelloServiceImpl s5g1 = new GraphHelloServiceImpl("g1");
+
+        rpcServer3.config().addService(HelloService.class, s3g1);
+        rpcServer4.config().addService(HelloService.class, s4g1);
+        rpcServer5.config().addService(HelloService.class, s5g1);
+
+        startServer(rpcServer3);
+        startServer(rpcServer4);
+        startServer(rpcServer5);
+
+        // Test LB "consistentHash"
+        HugeConfig clientLB = config("client-lb");
+        RpcClientProvider rpcClientCHash = new RpcClientProvider(clientLB);
+        HelloService cHash = rpcClientCHash.config()
+                                           .serviceProxy(HelloService.class);
+
+        Assert.assertEquals("g1: load", cHash.echo("load"));
+        Assert.assertEquals(16.8, cHash.sum(10, 6.8), 0.00000001d);
+        Assert.assertEquals(16.8, s3g1.result() + s4g1.result() + s5g1.result(),
+                            0.00000001d);
+
+        Assert.assertEquals("g1: load", cHash.echo("load"));
+        Assert.assertEquals(16.8, cHash.sum(10, 6.8), 0.00000001d);
+        Assert.assertEquals(16.8, s3g1.result() + s4g1.result() + s5g1.result(),
+                            0.00000001d);
+
+        Assert.assertEquals("g1: load", cHash.echo("load"));
+        Assert.assertEquals(16.8, cHash.sum(10, 6.8), 0.00000001d);
+        Assert.assertEquals(16.8, s3g1.result() + s4g1.result() + s5g1.result(),
+                            0.00000001d);
+
+        s3g1.resetResult();
+        s4g1.resetResult();
+        s5g1.resetResult();
+
+        // Test LB "roundRobin"
+        String lbKey = com.baidu.hugegraph.config
+                          .RpcOptions.RPC_CLIENT_LOAD_BALANCER.name();
+        clientLB.setProperty(lbKey, "roundRobin");
+        RpcClientProvider rpcClientRound = new RpcClientProvider(clientLB);
+        HelloService round = rpcClientRound.config()
+                                           .serviceProxy(HelloService.class);
+
+        Assert.assertEquals("g1: load", round.echo("load"));
+        Assert.assertEquals(1.1, round.sum(1, 0.1), 0.00000001d);
+        Assert.assertEquals(1.1, s3g1.result() + s4g1.result() + s5g1.result(),
+                            0.00000001d);
+
+        Assert.assertEquals("g1: load", round.echo("load"));
+        Assert.assertEquals(1.1, round.sum(1, 0.1), 0.00000001d);
+        Assert.assertEquals(2.2, s3g1.result() + s4g1.result() + s5g1.result(),
+                            0.00000001d);
+
+        Assert.assertEquals("g1: load", round.echo("load"));
+        Assert.assertEquals(1.1, round.sum(1, 0.1), 0.00000001d);
+        Assert.assertEquals(3.3, s3g1.result() + s4g1.result() + s5g1.result(),
+                            0.00000001d);
+
+        s3g1.resetResult();
+        s4g1.resetResult();
+        s5g1.resetResult();
+
+        // Test LB "random"
+        clientLB.setProperty(lbKey, "random");
+        RpcClientProvider rpcClientRandom = new RpcClientProvider(clientLB);
+        HelloService random = rpcClientRandom.config()
+                                             .serviceProxy(HelloService.class);
+
+        Assert.assertEquals("g1: load", random.echo("load"));
+        Assert.assertEquals(1.1, random.sum(1, 0.1), 0.00000001d);
+        Assert.assertEquals(1.1, s3g1.result() + s4g1.result() + s5g1.result(),
+                            0.00000001d);
+
+        Assert.assertEquals("g1: load", random.echo("load"));
+        Assert.assertEquals(1.1, random.sum(1, 0.1), 0.00000001d);
+        double sum = s3g1.result() + s4g1.result() + s5g1.result();
+        Assert.assertTrue(2.2 == sum || 1.1 == sum);
+
+        Assert.assertEquals("g1: load", random.echo("load"));
+        Assert.assertEquals(1.1, random.sum(1, 0.1), 0.00000001d);
+        double sum2 = s3g1.result() + s4g1.result() + s5g1.result();
+        Assert.assertTrue(sum == sum2 || sum + 1.1 == sum2);
+
+        for (int i = 0; i < 9; i++) {
+            Assert.assertEquals(1.1, random.sum(1, 0.1), 0.00000001d);
+        }
+        Assert.assertEquals(3.3, s3g1.result() + s4g1.result() + s5g1.result(),
+                            0.00000001d);
+
+        s3g1.resetResult();
+        s4g1.resetResult();
+        s5g1.resetResult();
+
+        // Destroy all
+        rpcClientCHash.destroy();
+        rpcClientRound.destroy();
+        rpcClientRandom.destroy();
+
+        stopServer(rpcServer3);
+        stopServer(rpcServer4);
+        stopServer(rpcServer5);
+    }
+
+    @Test
+    public void testServiceProxy() {
+        RpcProviderConfig serverConfig = rpcServer.config();
+        serverConfig.addService(HelloService.class, new HelloServiceImpl());
+        serverConfig.addService("graph", HelloService.class,
+                                new GraphHelloServiceImpl("graph"));
+        startServer(rpcServer);
+
+        RpcConsumerConfig clientConfig = rpcClient.config();
+        HelloService client = clientConfig.serviceProxy(HelloService.class);
+        HelloService client2 = clientConfig.serviceProxy(HelloService.class);
+        HelloService clientG = clientConfig.serviceProxy("graph",
+                                                         HelloService.class);
+
+        Assert.assertNotEquals(client, client2);
+        Assert.assertEquals("hello tom!", client.hello("tom"));
+        Assert.assertEquals("hello tom!", client2.hello("tom"));
+        Assert.assertEquals("graph: hello tom!", clientG.hello("tom"));
+
+        rpcClient.unreferAll();
+
+        Assert.assertThrows(SofaRpcRuntimeException.class, () -> {
+            client.hello("tom");
+        });
+        Assert.assertThrows(SofaRpcRuntimeException.class, () -> {
+            client2.hello("tom");
+        });
+        Assert.assertThrows(SofaRpcRuntimeException.class, () -> {
+            clientG.hello("tom");
+        });
+    }
+
+    @Test
+    public void testAddServiceMultiTimesOfSameService() {
+        RpcServer rpcServerExport = new RpcServer(config(true));
+
+        rpcServerExport.config().addService(HelloService.class,
+                                            new HelloServiceImpl());
+
+        Assert.assertThrows(IllegalArgumentException.class, () -> {
+            rpcServerExport.config().addService(HelloService.class,
+                                                new HelloServiceImpl());
+        }, e -> {
+            Assert.assertContains("Not allowed to add service already exist",
+                                  e.getMessage());
+        });
+
+        rpcServerExport.exportAll();
+
+        stopServer(rpcServerExport);
+    }
+
+    @Test
+    public void testExportMultiTimesOfSameServer() {
+        RpcServer rpcServerExport = new RpcServer(config(true));
+        rpcServerExport.config().addService(HelloService.class,
+                                            new HelloServiceImpl());
+        rpcServerExport.exportAll();
+        rpcServerExport.exportAll();
+
+        stopServer(rpcServerExport);
+    }
+
+    @Test
+    public void testExportMultiTimesOfSameService() {
+        RpcServer rpcServerExport = new RpcServer(config(true));
+        rpcServerExport.config().addService(HelloService.class,
+                                            new HelloServiceImpl());
+        rpcServerExport.exportAll();
+
+        rpcServerExport.config().addService("graph", HelloService.class,
+                                            new HelloServiceImpl());
+        rpcServerExport.exportAll();
+
+        stopServer(rpcServerExport);
+    }
+
+    @Test
+    public void testExportNoneService() {
+        RpcServer rpcServerNoneService = new RpcServer(config(true));
+
+        // Will be ignored if none service added
+        rpcServerNoneService.exportAll();
+
+        stopServer(rpcServerNoneService);
+    }
+
+    @Test
+    public void testUnexportService() {
+        RpcServer rpcServerUnexport = new RpcServer(config(true));
+
+        RpcProviderConfig serverConfig = rpcServerUnexport.config();
+        String service = serverConfig.addService(HelloService.class,
+                                                 new HelloServiceImpl());
+        rpcServerUnexport.exportAll();
+
+        RpcConsumerConfig clientConfig = rpcClient.config();
+        HelloService client = clientConfig.serviceProxy(HelloService.class);
+
+        Assert.assertEquals("hello tom!", client.hello("tom"));
+
+        rpcServerUnexport.unexport(service);
+
+        Assert.assertThrows(SofaRpcException.class, () -> {
+            client.hello("tom");
+        });
+
+        stopServer(rpcServerUnexport);
+    }
+
+    @Test
+    public void testUnexportAllService() {
+        RpcServer rpcServerUnexport = new RpcServer(config(true));
+
+        RpcProviderConfig serverConfig = rpcServerUnexport.config();
+        serverConfig.addService(HelloService.class, new HelloServiceImpl());
+        serverConfig.addService("graph", HelloService.class,
+                                new GraphHelloServiceImpl("graph"));
+        rpcServerUnexport.exportAll();
+
+        RpcConsumerConfig clientConfig = rpcClient.config();
+        HelloService client = clientConfig.serviceProxy(HelloService.class);
+        HelloService clientG = clientConfig.serviceProxy("graph",
+                                                         HelloService.class);
+
+        Assert.assertEquals("hello tom!", client.hello("tom"));
+        Assert.assertEquals("graph: hello tom!", clientG.hello("tom"));
+
+        rpcServerUnexport.unexportAll();
+
+        Assert.assertThrows(SofaRpcException.class, () -> {
+            client.hello("tom");
+        });
+        Assert.assertThrows(SofaRpcException.class, () -> {
+            clientG.hello("tom");
+        });
+
+        stopServer(rpcServerUnexport);
+    }
+
+    @Test
+    public void testUnexportNotExistService() {
+        Assert.assertThrows(IllegalArgumentException.class, () -> {
+            rpcServer.unexport("fake");
+        }, e -> {
+            Assert.assertContains("The service 'fake' doesn't exist",
+                                  e.getMessage());
+        });
+    }
+
+    @Test
+    public void testServerDisabled() {
+        HugeConfig clientConf = config(false);
+        RpcServer rpcServerDisabled = new RpcServer(clientConf);
+
+        Assert.assertFalse(rpcServerDisabled.enabled());
+        Assert.assertThrows(IllegalArgumentException.class, () -> {
+            rpcServerDisabled.config();
+        }, e -> {
+            Assert.assertContains("RpcServer is not enabled", e.getMessage());
+        });
+
+        stopServer(rpcServerDisabled);
+    }
+
+    @Test
+    public void testClientDisabled() {
+        HugeConfig serverConf = config(true);
+        RpcClientProvider rpcClientDisabled = new RpcClientProvider(serverConf);
+
+        Assert.assertFalse(rpcClientDisabled.enabled());
+        Assert.assertThrows(IllegalArgumentException.class, () -> {
+            rpcClientDisabled.config();
+        }, e -> {
+            Assert.assertContains("RpcClient is not enabled", e.getMessage());
+        });
+
+        rpcClientDisabled.destroy();
+    }
+
+    @Test
+    public void testInitRpcConfigs() {
+        ImmutableMap<String, Object> fixedOptions = ImmutableMap.of(
+                RpcOptions.PROVIDER_REPEATED_EXPORT_LIMIT, 1);
+        RpcCommonConfig.initRpcConfigs(fixedOptions);
+
+        RpcCommonConfig.initRpcConfigs(RpcOptions.CONSUMER_RETRIES, 2);
     }
 
     public static interface HelloService {
@@ -166,6 +567,10 @@ public class ServerClientTest extends BaseUnitTest {
             return this.graph;
         }
 
+        public void resetResult() {
+            this.result = 0.0;
+        }
+
         public double result() {
             return this.result;
         }
@@ -177,7 +582,7 @@ public class ServerClientTest extends BaseUnitTest {
 
         @Override
         public String echo(String string) {
-            return  this.graph + ": " + string;
+            return this.graph + ": " + string;
         }
 
         @Override

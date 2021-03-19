@@ -53,6 +53,12 @@ public class RpcClientProvider {
         return this.consumerConfig;
     }
 
+    public void unreferAll() {
+        if (this.consumerConfig != null) {
+            this.consumerConfig.removeAllServiceProxy();
+        }
+    }
+
     public void destroy() {
         if (this.consumerConfig != null) {
             this.consumerConfig.destroy();
