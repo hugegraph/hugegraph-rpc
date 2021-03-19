@@ -83,7 +83,10 @@ public class RpcServer {
         if (server instanceof BoltServer && server.isStarted()) {
             /*
              * When using random port 0, try to fetch the actual port
-             * TODO: remove this code after adding Server.port() interface
+             * NOTE: RemotingServer.port() would return the actual port only
+             *       if sofa-bolt version >= 1.6.1, please see:
+             *       https://github.com/sofastack/sofa-bolt/issues/196
+             * TODO: remove this code after adding Server.port() interface:
              *       https://github.com/sofastack/sofa-rpc/issues/1022
              */
             RemotingServer rs = Whitebox.getInternalState(server,
