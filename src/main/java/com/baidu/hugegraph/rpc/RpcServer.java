@@ -52,9 +52,11 @@ public class RpcServer {
         String host = config.get(RpcOptions.RPC_SERVER_HOST);
         if (StringUtils.isNotBlank(host)) {
             int port = config.get(RpcOptions.RPC_SERVER_PORT);
+            boolean adaptivePort = config.get(RpcOptions.RPC_ADAPTIVE_PORT);
             this.serverConfig = new ServerConfig();
             this.serverConfig.setProtocol(config.get(RpcOptions.RPC_PROTOCOL))
                              .setHost(host).setPort(port)
+                             .setAdaptivePort(adaptivePort)
                              .setDaemon(false);
         } else {
             this.serverConfig = null;

@@ -56,6 +56,17 @@ public class RpcOptions extends OptionHolder {
                     8090
             );
 
+    public static final ConfigOption<Boolean> RPC_ADAPTIVE_PORT =
+            new ConfigOption<>(
+                    "rpc.server_adaptive_port",
+                    "Whether the bound port is adaptive, if it's enabled, " +
+                    "when the port is in use, automatically +1 to detect " +
+                    "the next available port. Note that this process is " +
+                    "not atomic, so there may still be port conflicts.",
+                    disallowEmpty(),
+                    false
+            );
+
     public static final ConfigOption<Integer> RPC_SERVER_TIMEOUT =
             new ConfigOption<>(
                     "rpc.server_timeout",

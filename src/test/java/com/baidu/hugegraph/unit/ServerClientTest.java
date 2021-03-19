@@ -20,6 +20,7 @@
 package com.baidu.hugegraph.unit;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 
 import org.junit.After;
@@ -162,6 +163,47 @@ public class ServerClientTest extends BaseUnitTest {
         // Destroy all
         rpcClientRandom.destroy();
         stopServer(rpcServerRandom);
+    }
+
+    @Test
+    public void testStartServerWithAdaptivePort() throws IOException {
+        // Init server
+        RpcServer rpcServerAdaptive = new RpcServer(config("server-adaptive"));
+        RpcProviderConfig serverConfig = rpcServerAdaptive.config();
+        serverConfig.addService(HelloService.class, new HelloServiceImpl());
+
+        // Start other server bound the port
+        int usedPort = rpcServerAdaptive.port();
+        InetAddress ip = InetAddress.getByName(rpcServerAdaptive.host());
+        ServerSocket inUse = new ServerSocket(usedPort,50, ip);
+
+        // Start server after the port in use
+        startServer(rpcServerAdaptive);
+
+        Assert.assertNotEquals(0, rpcServerAdaptive.port());
+        Assert.assertNotEquals(usedPort, rpcServerAdaptive.port());
+
+        // Init client
+        HugeConfig config = config(false);
+        String url = rpcServerAdaptive.host() + ":" + rpcServerAdaptive.port();
+        String remoteUrlKey = com.baidu.hugegraph.config
+                                 .RpcOptions.RPC_REMOTE_URL.name();
+        config.setProperty(remoteUrlKey, url);
+        RpcClientProvider rpcClientAdaptive = new RpcClientProvider(config);
+
+        RpcConsumerConfig clientConfig = rpcClientAdaptive.config();
+        HelloService client = clientConfig.serviceProxy(HelloService.class);
+
+        // Test call
+        Assert.assertEquals("hello tom!", client.hello("tom"));
+        Assert.assertEquals("tom", client.echo("tom"));
+        Assert.assertEquals(5.14, client.sum(2, 3.14), 0.00000001d);
+
+        // Destroy all
+        rpcClientAdaptive.destroy();
+        stopServer(rpcServerAdaptive);
+
+        inUse.close();
     }
 
     @Test
