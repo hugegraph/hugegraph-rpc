@@ -34,6 +34,8 @@ import com.baidu.hugegraph.rpc.RpcConsumerConfig;
 import com.baidu.hugegraph.rpc.RpcProviderConfig;
 import com.baidu.hugegraph.rpc.RpcServer;
 import com.baidu.hugegraph.testutil.Assert;
+import com.baidu.hugegraph.testutil.Whitebox;
+import com.baidu.hugegraph.util.E;
 import com.google.common.collect.ImmutableMap;
 
 public class ServerClientTest extends BaseUnitTest {
@@ -82,6 +84,12 @@ public class ServerClientTest extends BaseUnitTest {
         Assert.assertEquals("hello tom!", client.hello("tom"));
         Assert.assertEquals("tom", client.echo("tom"));
         Assert.assertEquals(5.14, client.sum(2, 3.14), 0.00000001d);
+
+        Assert.assertThrows(IllegalArgumentException.class, () -> {
+            client.hello("");
+        }, e -> {
+            Assert.assertContains("empty hello parameter", e.getMessage());
+        });
     }
 
     @Test
@@ -181,7 +189,7 @@ public class ServerClientTest extends BaseUnitTest {
     }
 
     @Test
-    public void testRpcFanoutService() {
+    public void testFanoutCallService() {
         // Init 3 servers
         HugeConfig server3 = config("server3");
         RpcServer rpcServer3 = new RpcServer(server3);
@@ -215,12 +223,108 @@ public class ServerClientTest extends BaseUnitTest {
         Assert.assertEquals("g1: fanout", g1.echo("fanout"));
         Assert.assertEquals(16.8, g1.sum(10, 6.8), 0.00000001d);
 
+        Assert.assertThrows(IllegalArgumentException.class, () -> {
+            g1.hello("");
+        }, e -> {
+            Assert.assertContains("empty hello parameter", e.getMessage());
+        });
+
         Assert.assertEquals(16.8, s3g1.result(), 0.00000001d);
         Assert.assertEquals(16.8, s4g1.result(), 0.00000001d);
         Assert.assertEquals(16.8, s5g1.result(), 0.00000001d);
 
         // Destroy all
         rpcClient345.destroy();
+
+        stopServer(rpcServer3);
+        stopServer(rpcServer4);
+        stopServer(rpcServer5);
+    }
+
+    @Test
+    public void testFanoutCallServiceWithError() {
+        // Init 3 servers
+        HugeConfig server3 = config("server3");
+        RpcServer rpcServer3 = new RpcServer(server3);
+
+        HugeConfig server4 = config("server4");
+        RpcServer rpcServer4 = new RpcServer(server4);
+
+        HugeConfig server5 = config("server5");
+        RpcServer rpcServer5 = new RpcServer(server5);
+
+        GraphHelloServiceImpl s3g1 = new GraphHelloServiceImpl("g1");
+        GraphHelloServiceImpl s4g1 = new GraphHelloServiceImpl("g1");
+        GraphHelloServiceImpl s5g1 = new GraphHelloServiceImpl("g1");
+
+        rpcServer3.config().addService(s3g1.graph(), HelloService.class, s3g1);
+        rpcServer4.config().addService(s4g1.graph(), HelloService.class, s4g1);
+        rpcServer5.config().addService(s5g1.graph(), HelloService.class, s5g1);
+
+        startServer(rpcServer3);
+        startServer(rpcServer4);
+        startServer(rpcServer5);
+
+        // Init client with one server unavailable
+        HugeConfig client346 = config("client346");
+        RpcClientProvider rpcClient346 = new RpcClientProvider(client346);
+
+        HelloService g1 = rpcClient346.config()
+                                      .serviceProxy("g1", HelloService.class);
+
+        // Test fanout with one failed
+        Assert.assertEquals("g1: fanout", g1.echo("fanout"));
+        Assert.assertEquals(16.8, g1.sum(10, 6.8), 0.00000001d);
+
+        Assert.assertThrows(IllegalArgumentException.class, () -> {
+            g1.hello("");
+        }, e -> {
+            Assert.assertContains("empty hello parameter", e.getMessage());
+        });
+
+        Assert.assertEquals(16.8, s3g1.result(), 0.00000001d);
+        Assert.assertEquals(16.8, s4g1.result(), 0.00000001d);
+        Assert.assertEquals(0.0, s5g1.result(), 0.00000001d);
+
+        s3g1.resetResult();
+        s4g1.resetResult();
+        s5g1.resetResult();
+
+        // Init client with all servers unavailable
+        HugeConfig client67 = config("client67");
+        RpcClientProvider rpcClient67 = new RpcClientProvider(client67);
+
+        HelloService g67 = rpcClient67.config()
+                                      .serviceProxy("g1", HelloService.class);
+
+        // Test fanout with all failed
+        Assert.assertThrows(SofaRpcException.class, () -> {
+            g67.echo("fanout");
+        }, e -> {
+            Assert.assertContains("Failed to call", e.getMessage());
+            Assert.assertContains("echo() on remote server", e.getMessage());
+        });
+
+        Assert.assertEquals(0.0, s3g1.result(), 0.00000001d);
+        Assert.assertEquals(0.0, s4g1.result(), 0.00000001d);
+        Assert.assertEquals(0.0, s5g1.result(), 0.00000001d);
+
+        // Init client with none service provider
+        RpcClientProvider rpcClient0 = new RpcClientProvider(client67);
+        Whitebox.setInternalState(rpcClient0, "consumerConfig.remoteUrls",
+                                  "");
+        HelloService g0 = rpcClient0.config()
+                                    .serviceProxy("g1", HelloService.class);
+
+        Assert.assertThrows(SofaRpcException.class, () -> {
+            g0.echo("fanout");
+        }, e -> {
+            Assert.assertContains("No service provider for", e.getMessage());
+        });
+
+        // Destroy all
+        rpcClient346.destroy();
+        rpcClient67.destroy();
 
         stopServer(rpcServer3);
         stopServer(rpcServer4);
@@ -550,6 +654,7 @@ public class ServerClientTest extends BaseUnitTest {
 
         @Override
         public String hello(String string) {
+            E.checkArgument(!string.isEmpty(), "empty hello parameter");
             return "hello " + string + "!";
         }
 
@@ -587,6 +692,7 @@ public class ServerClientTest extends BaseUnitTest {
 
         @Override
         public String hello(String string) {
+            E.checkArgument(!string.isEmpty(), "empty hello parameter");
             return this.graph + ": hello " + string + "!";
         }
 

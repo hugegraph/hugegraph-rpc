@@ -197,13 +197,15 @@ public class RpcConsumerConfig implements RpcServiceConfig4Client {
                 throw new SofaRpcException(RpcErrorType.CLIENT_UNDECLARED_ERROR,
                           "Failed to call " + method + " on remote server " +
                           providerInfo + ", return null response");
-            } catch (SofaRpcException e) {
-                throw e;
             } catch (Exception e) {
+                int error = RpcErrorType.CLIENT_UNDECLARED_ERROR;
+                if (e instanceof SofaRpcException) {
+                    error = ((SofaRpcException) e).getErrorType();
+                }
                 String method = methodName(request);
-                throw new SofaRpcException(RpcErrorType.CLIENT_UNDECLARED_ERROR,
+                throw new SofaRpcException(error,
                           "Failed to call " + method + " on remote server " +
-                          providerInfo + ", cause by exception: " + e);
+                          providerInfo + ", caused by exception: " + e);
             }
         }
 

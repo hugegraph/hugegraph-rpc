@@ -35,7 +35,8 @@ public class RpcProviderConfig implements RpcServiceConfig4Server {
     }
 
     @Override
-    public <T, S extends T> String addService(String graph, Class<T> clazz,
+    public <T, S extends T> String addService(String graph,
+                                              Class<T> clazz,
                                               S serviceImpl) {
         return this.addService(graph, clazz.getName(), serviceImpl);
     }
